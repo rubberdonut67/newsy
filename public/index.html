@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0d12" />
+    <title>Newsy</title>
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <!-- Installing as an app gives notifications Newsy's own name and icon,
+         instead of attributing them to the browser. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="application-name" content="Newsy" />
+    <meta name="apple-mobile-web-app-title" content="Newsy" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="1" y="1" width="22" height="22" rx="6.5" fill="#2f6bff" />
+          <path d="M6 8h10M6 12h10M6 16h6" stroke="#fff" stroke-width="1.9" stroke-linecap="round" fill="none" />
+          <circle cx="17.6" cy="16.4" r="2.9" fill="#fff" />
+          <circle cx="17.6" cy="16.4" r="1.3" fill="#2f6bff" />
+        </svg>
+        <h1>Newsy</h1>
+        <span id="live" class="live" title="Live connection status"><i></i>connecting</span>
+      </div>
+      <div class="topbar-actions">
+        <!-- This mutes; it does not arm. There is still no "Enable alerts"
+             button, by design: alerts are on whenever Newsy is running, and an
+             alerting app whose alerts depend on remembering to press something
+             is an app that silently fails. A mute is the opposite shape — it
+             starts off, it says so on the button, in the tray tooltip and in the
+             log for as long as it is on, and it can be given a deadline. The
+             Windows notification itself is suppressed in desktop/notifier.js,
+             the one place a toast is raised; this button only records the
+             choice, and the service holds it so all three processes agree. -->
+        <div class="mute" id="mute">
+          <button
+            id="btn-mute"
+            class="btn"
+            aria-haspopup="true"
+            aria-expanded="false"
+            title="Mute alerts"
+          >
+            <svg class="mute-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                class="mute-bell"
+                d="M6 9a6 6 0 0 1 12 0c0 4 1.4 5.2 2 6H4c.6-.8 2-2 2-6Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M10 18.5a2.2 2.2 0 0 0 4 0"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              />
+              <line
+                class="mute-slash hidden"
+                x1="4"
+                y1="20"
+                x2="20"
+                y2="4"
+                stroke="currentColor"
+                stroke-width="1.9"
+                stroke-linecap="round"
+              />
+            </svg>
+            <span id="mute-label" class="mute-label"></span>
+          </button>
+
+          <div id="mute-menu" class="mute-menu hidden" role="dialog" aria-label="Alerts">
+            <p id="mute-status" class="mute-status"></p>
+            <div id="mute-actions" class="mute-actions"></div>
+            <fieldset class="mute-scope">
+              <legend>While muted, silence</legend>
+              <label class="row">
+                <input type="radio" name="mute-scope" value="toasts" />
+                Windows pop-ups only
+              </label>
+              <label class="row">
+                <input type="radio" name="mute-scope" value="all" />
+                Also Newsy's own tray messages
+              </label>
+            </fieldset>
+          </div>
+        </div>
+        <button id="btn-refresh" class="btn" title="Poll every source now">Refresh</button>
+        <button id="btn-logout" class="btn btn-ghost hidden">Sign out</button>
+      </div>
+    </header>
+
+    <p id="security-banner" class="security-banner hidden"></p>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <nav class="tabs" role="tablist">
+          <button class="tab is-active" data-view="feed" role="tab">Feed</button>
+          <button class="tab" data-view="sources" role="tab">Sources</button>
+          <!-- Publisher sessions only exist in the desktop shell; app.js reveals
+               this tab when it detects one. -->
+          <button class="tab hidden" data-view="subs" id="tab-subs" role="tab">Subscriptions</button>
+          <!-- Maintainer diagnostics, not a user feature. Running the shell is
+               NOT enough to reveal this one: app.js keeps it hidden until
+               someone presses Ctrl+Shift+D. Do not add a visible affordance. -->
+          <button class="tab hidden" data-view="dev" id="tab-dev" role="tab">Developer</button>
+        </nav>
+
+        <section id="topics-panel">
+          <div class="panel-head">
+            <h2>Topics</h2>
+            <button id="btn-new-topic" class="btn btn-small btn-primary">New</button>
+          </div>
+
+          <form id="topic-form" class="card form hidden">
+            <h3 id="form-title" class="form-title">New topic</h3>
+            <label>
+              Name
+              <input name="name" placeholder="Fed rate decisions" autocomplete="off" />
+            </label>
+            <label>
+              Match
+              <textarea
+                name="query"
+                rows="2"
+                required
+                placeholder='"interest rate" OR "rate cut" fed -sports'
+              ></textarea>
+            </label>
+            <p class="hint">
+              Space&nbsp;=&nbsp;and · <code>OR</code> · <code>"phrase"</code> ·
+              <code>-exclude</code> · <code>word*</code>
+            </p>
+            <label class="row">
+              <input type="checkbox" name="notify" checked />
+              Send me an alert
+            </label>
+            <label class="row">
+              <input type="checkbox" name="useGnews" checked />
+              Also search Google News
+            </label>
+            <label class="row hidden" id="row-enabled">
+              <input type="checkbox" name="enabled" checked />
+              Active — keep watching for this
+            </label>
+            <div id="preview" class="preview hidden"></div>
+            <div class="form-actions">
+              <button type="button" id="btn-preview" class="btn btn-small">Test</button>
+              <button type="submit" id="btn-save-topic" class="btn btn-small btn-primary">
+                Create
+              </button>
+              <button type="button" id="btn-cancel-topic" class="btn btn-small btn-ghost">
+                Cancel
+              </button>
+            </div>
+            <p id="topic-error" class="error hidden"></p>
+          </form>
+
+          <ul id="topic-list" class="topic-list"></ul>
+          <p id="combine-hint" class="hint combine-hint hidden">
+            Tip: <kbd>Ctrl</kbd>-click topics to combine several into one feed.
+          </p>
+        </section>
+
+        <section class="stats card" id="stats"></section>
+      </aside>
+
+      <section class="content">
+        <div id="view-feed">
+          <div class="content-head">
+            <h2 id="feed-title">Everything</h2>
+            <div class="content-actions">
+              <label class="row"><input type="checkbox" id="filter-unread" /> Unread only</label>
+              <button id="btn-read-all" class="btn btn-small btn-ghost">Mark all read</button>
+            </div>
+          </div>
+          <ul id="matches" class="matches"></ul>
+          <p id="empty" class="empty hidden"></p>
+        </div>
+
+        <div id="view-sources" class="hidden">
+          <div class="content-head">
+            <h2>Sources</h2>
+            <form id="feed-form" class="inline-form">
+              <input name="url" placeholder="https://example.com/feed.xml" required />
+              <button class="btn btn-small btn-primary" type="submit">Add feed</button>
+            </form>
+          </div>
+          <p id="feed-error" class="error hidden"></p>
+          <ul id="feed-list" class="feed-list"></ul>
+        </div>
+
+        <div id="view-subs" class="hidden">
+          <div class="content-head">
+            <h2>Subscriptions</h2>
+            <form id="sub-form" class="inline-form">
+              <input name="url" placeholder="wsj.com, or paste a login page URL" required />
+              <button class="btn btn-small btn-primary" type="submit">Add site</button>
+            </form>
+          </div>
+          <p class="hint sub-hint">
+            Newsy never stores a password. Signing in opens the publisher’s own login page in
+            Newsy’s browser, and the session it hands back is kept here — separate from Chrome,
+            and only for these sites. Adding a site you already have updates its login page.
+          </p>
+          <p id="sub-error" class="error hidden"></p>
+          <ul id="sub-list" class="feed-list"></ul>
+        </div>
+
+        <!-- Diagnostics only. Blocking is deliberately invisible in normal use:
+             a clean page is the feature, a counter on screen is not. -->
+        <div id="view-dev" class="hidden">
+          <div class="content-head">
+            <h2>Developer</h2>
+            <button id="btn-dev-refresh" class="btn btn-small btn-ghost">Refresh</button>
+          </div>
+          <dl id="dev-stats" class="dev-stats"></dl>
+
+          <h3 class="dev-head">Where articles are stored</h3>
+          <p class="hint sub-hint">
+            The database, log and keys all live in this folder. Changing it takes effect the
+            next time the Newsy service starts.
+          </p>
+          <dl id="dev-store" class="dev-stats"></dl>
+
+          <form id="data-dir-form" class="dev-form">
+            <div class="dev-row">
+              <input
+                id="data-dir-input"
+                type="text"
+                name="path"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="D:\NewsyData"
+                aria-label="Folder to store articles in"
+              />
+              <button type="button" id="btn-data-dir-browse" class="btn btn-small btn-ghost">
+                Browse…
+              </button>
+            </div>
+            <label class="dev-check">
+              <input type="checkbox" id="data-dir-move" checked />
+              Move the existing database and log to the new folder
+            </label>
+            <p id="data-dir-error" class="error hidden"></p>
+            <p id="data-dir-note" class="hint sub-hint hidden"></p>
+            <button type="submit" id="btn-data-dir-save" class="btn btn-small btn-primary">
+              Save location
+            </button>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <!-- Reader chrome. The page itself is a native view the shell positions
+         directly beneath this strip, so nothing below it belongs to the DOM. -->
+    <div id="reader-bar" class="reader-bar hidden">
+      <button id="reader-back" class="reader-btn" title="Back" aria-label="Back">‹</button>
+      <button id="reader-reload" class="reader-btn" title="Reload" aria-label="Reload">↻</button>
+      <div class="reader-loc">
+        <strong id="reader-title"></strong>
+        <span id="reader-host"></span>
+      </div>
+      <button id="reader-external" class="btn btn-small btn-ghost">Open in browser</button>
+      <button id="reader-close" class="btn btn-small">Close</button>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

@@ -1,0 +1,26 @@
+node_modules/
+data/
+.env
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+
+# Local snapshots taken before risky edits. Useful on this machine, 18 MB of
+# duplicated source in a clone.
+backups/
+
+# Per-machine Claude Code tool permissions. launch.json is shared on purpose.
+.claude/settings.local.json
+
+# Scratch copies of the database made while testing.
+*.db.tmp
+
+# Installer build output.
+dist/
+
+# Internal working notes. They name the maintainer's own machine and software
+# and stay local; the README is the public documentation.
+HANDOFF.md
+HANDOFF-*.md
+work_log.md

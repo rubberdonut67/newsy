@@ -1,0 +1,44 @@
+# fly.toml — `fly launch --no-deploy` will fill in your app name and region.
+app = "newsy"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  DATA_DIR = "/data"
+  HOST = "0.0.0.0"   # the app defaults to loopback; Fly's proxy needs every interface
+  # Set NEWSY_PASSWORD as a secret (`fly secrets set NEWSY_PASSWORD=...`) — without it
+  # the deployment is open to anyone.
+  # Set PUBLIC_URL to your real hostname so notification links point back here.
+  # PUBLIC_URL = "https://newsy.fly.dev"
+
+# SQLite lives on the volume, so the app runs as a single machine.
+# `fly volumes create newsy_data --size 3`
+[mounts]
+  source = "newsy_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false   # the poller must keep running between visits
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 200
+    soft_limit = 150
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "15s"
+  method = "GET"
+  path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

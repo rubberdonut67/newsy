@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Newsy reader</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --surface: #ffffff;
+        --border: #dfe3ea;
+        --text: #14171f;
+        --muted: #5f6875;
+        --accent: #2f6bff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b0d12;
+          --surface: #141821;
+          --border: #262c39;
+          --text: #e7eaf0;
+          --muted: #99a2b3;
+          --accent: #6f9bff;
+        }
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      .card {
+        max-width: 32rem;
+        padding: 2rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.25rem;
+      }
+      p {
+        margin: 0 0 1rem;
+        color: var(--muted);
+      }
+      code {
+        display: block;
+        padding: 0.6rem 0.8rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+        font-size: 13px;
+        color: var(--text);
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      .detail {
+        margin-top: 0.75rem;
+        font-size: 13px;
+      }
+      button {
+        margin-top: 1.25rem;
+        padding: 0.55rem 1rem;
+        font: inherit;
+        color: #fff;
+        background: var(--accent);
+        border: 0;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .hidden {
+        display: none;
+      }
+      /* Motion is a poor signal on its own, but a page that says "working" with
+         nothing moving reads as frozen — which is the exact failure this page
+         exists to prevent. */
+      .dot {
+        display: inline-block;
+        animation: blink 1.4s infinite both;
+      }
+      .dot:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .dot:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes blink {
+        0%,
+        80%,
+        100% {
+          opacity: 0.2;
+        }
+        40% {
+          opacity: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .dot {
+          animation: none;
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1 id="heading"></h1>
+      <p id="lede"></p>
+      <code id="target"></code>
+      <p class="detail hidden" id="detail"></p>
+      <button id="retry" class="hidden">Try again</button>
+    </main>
+    <script>
+      /**
+       * The reader deliberately has no preload — it renders untrusted pages and
+       * must not reach anything Newsy owns. So this page cannot call back into
+       * the shell, and does not need to: retrying is just navigating the view to
+       * the original URL, which re-enters the shell's normal open path.
+       */
+      const params = new URLSearchParams(location.search);
+      const url = params.get('url') || '';
+      const mode = params.get('mode') === 'waiting' ? 'waiting' : 'error';
+
+      const heading = document.getElementById('heading');
+      const lede = document.getElementById('lede');
+      const target = document.getElementById('target');
+      const detail = document.getElementById('detail');
+      const retry = document.getElementById('retry');
+
+      // textContent throughout: the URL and the error string both come from the
+      // page that failed, and neither is trusted markup.
+      target.textContent = url || '(no address)';
+
+      if (mode === 'waiting') {
+        heading.textContent = '🛡️ Getting protection ready';
+        lede.innerHTML =
+          'Loading the ad and tracker filters before opening the page, so it never renders unprotected. This is usually about a second, but a first run has to build them<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>';
+      } else {
+        heading.textContent = "📰 That page didn't load";
+        lede.textContent =
+          'Newsy could not open this address. The site may be down or blocking embedded browsers, or the link may be dead. Use "Open in browser" in the bar above to try it in Chrome.';
+        const description = params.get('desc');
+        const code = params.get('code');
+        if (description) {
+          detail.textContent = code ? `${description} (${code})` : description;
+          detail.classList.remove('hidden');
+        }
+        if (url) {
+          retry.classList.remove('hidden');
+          retry.addEventListener('click', () => {
+            retry.disabled = true;
+            retry.textContent = 'Retrying…';
+            location.href = url;
+          });
+        }
+      }
+    </script>
+  </body>
+</html>
